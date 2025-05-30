@@ -1,0 +1,53 @@
+name: echo-template
+
+entryPoint:
+  - main.sc
+
+botEngine: v2
+language: ru
+sts:
+  noMatchThreshold: 0.2
+caila:
+  noMatchThreshold: 0.2
+
+scriptsPreLoad:
+  global:
+    - /jslib/moment.min.js
+    - /jslib/underscore.js
+    - /jsapi/common.js
+    - /jsapi/smartPush.js
+    - /jsapi/smartProfile.js
+    - /jsapi/smartRating.js
+    - /jsapi/jivo.js
+  local:
+    - /jsapi/mail.js
+    - /jsapi/reactions.js
+    - /jsapi/http.js
+    - /jsapi/fetch.js
+
+tests:
+  include:
+    - test.xml
+
+intents:
+  - name: easy_level
+    examples: |
+      легкий
+      легкий уровень
+      хочу легкий
+      давай легкий
+      выбери легкий
+  - name: medium_level
+    examples: |
+      средний
+      средний уровень
+      хочу средний
+      давай средний
+      выбери средний
+  - name: hard_level
+    examples: |
+      сложный
+      сложный уровень
+      хочу сложный
+      давай сложный
+      выбери сложный
