@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import initialize from './config';
 import './styles.css';
+import { createAssistant, createSmartappDebugger } from '@salutejs/client';
     
     // Списки стран по уровням сложности
     const popularCountries = [
@@ -126,22 +126,42 @@ export const Game = () => {
     // Initialize Assistant
     useEffect(() => {
         let unsubscribe = null;
-
+        function getStateForAssistant() {
+            return {
+                currentDifficulty,
+                currentScore,
+                bestScores,
+                availableCountries: availableCountries.length
+            };
+        }
+        function getRecoveryState() {
+            return recoveryState;
+        }
         try {
-            // Initialize assistant
-            const assistant = initialize(
-                () => ({
-                    currentDifficulty,
-                    currentScore,
-                    bestScores,
-                    availableCountries: availableCountries.length
-                }),
-                () => recoveryState
-            );
-
+            let assistant;
+            if (process.env.NODE_ENV === 'development') {
+                if (!process.env.REACT_APP_TOKEN) {
+                    assistant = createMockAssistant();
+                } else {
+                    assistant = createSmartappDebugger({
+                        token: process.env.REACT_APP_TOKEN ?? '',
+                        initPhrase: 'Запусти игру угадай флаг',
+                        getState: getStateForAssistant,
+                        getRecoveryState: getRecoveryState,
+                        nativePanel: {
+                            defaultText: 'Покажи что-нибудь',
+                            screenshotMode: false,
+                            tabIndex: -1,
+                        },
+                    });
+                }
+            } else {
+                assistant = createAssistant({
+                    getState: getStateForAssistant,
+                    getRecoveryState: getRecoveryState,
+                });
+            }
             assistantRef.current = assistant;
-
-            // Handle assistant commands
             unsubscribe = assistant.on('data', (command) => {
                 if (command.navigation) {
                     switch(command.navigation.command) {
@@ -154,23 +174,18 @@ export const Game = () => {
                     }
                 }
             });
-
-            // Handle assistant errors
             assistant.on('error', (error) => {
                 console.error('Assistant error:', error);
             });
-
         } catch (error) {
             console.error('Failed to initialize assistant:', error);
         }
-
-        // Cleanup on unmount
         return () => {
             if (unsubscribe) {
                 unsubscribe();
             }
         };
-    }, []);
+    }, [currentDifficulty, currentScore, bestScores, availableCountries.length, recoveryState]);
 
     // Загрузка стран при монтировании компонента
     useEffect(() => {
@@ -385,16 +400,6 @@ export const Game = () => {
         
         // Отображаем первый флаг
         displayRandomFlag();
-
-        // Отправляем сообщение ассистенту о начале игры
-        if (assistantRef.current) {
-            assistantRef.current.sendData({
-                action: {
-                    type: 'GAME_STARTED',
-                    payload: { difficulty: currentDifficulty }
-                }
-            });
-        }
     }
 
     // Переход к следующему уровню сложности
@@ -477,6 +482,18 @@ export const Game = () => {
             
             confettiContainer.appendChild(particle);
         }
+    }
+
+    function createMockAssistant() {
+        return {
+            on: (event, handler) => {
+                console.log(`Mock assistant: ${event} event handler attached`);
+                return () => console.log(`Mock assistant: ${event} event handler detached`);
+            },
+            sendData: (data) => {
+                console.log('Mock assistant: sending data', data);
+            }
+        };
     }
 
     return (
