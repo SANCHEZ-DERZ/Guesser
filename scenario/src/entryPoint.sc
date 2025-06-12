@@ -26,9 +26,9 @@ theme: /
         q!: (запусти | открой | вруби) Угадай флаг
         script:
             addGameControlSuggestions($context);
-            if (!$client.isGreetingPlayed) {
-                $client.isGreetingPlayed = true;
-                a: Добро пожаловать в игру "Угадай флаг"! Выберите сложность или начните игру.
+            if (!$session.isGreetingPlayed) {
+                $session.isGreetingPlayed = true;
+                $reactions.answer("Добро пожаловать в игру \"Угадай флаг\"! Выберите сложность или начните игру.");
             }
         go: /НачалоИгры
 

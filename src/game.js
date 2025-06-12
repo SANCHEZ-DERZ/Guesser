@@ -322,7 +322,18 @@ export const Game = ({
             const countries = data.map(country => {
                 const englishName = country.name.common;
                 const russianName = country.translations?.rus?.common || getRussianName(englishName) || englishName;
-                const flagUrl = country.flags.png;
+                // Формируем URL флага: сначала берем PNG, если его нет – самостоятельно формируем путь с CDN,
+                // в крайнем случае используем SVG.
+                let flagUrl = '';
+                if (country.cca2) {
+                    flagUrl = `https://flagcdn.com/w320/${country.cca2.toLowerCase()}.png`;
+                }
+                if (!flagUrl) {
+                    flagUrl = country.flags.png || country.flags.svg || '';
+                }
+                if (!flagUrl) {
+                    flagUrl = 'https://via.placeholder.com/400x200?text=Flag';
+                }
                 // Логируем URL флага для каждой страны
                 console.log(`Страна: ${englishName}, URL флага: ${flagUrl}`);
                 
@@ -625,9 +636,17 @@ export const Game = ({
                             alt={`Флаг ${currentCountry.name}`}
                             className="flag-image"
                             onError={(e) => {
-                                console.error('Error loading flag:', currentCountry.flag);
-                                e.target.onerror = null;
-                                e.target.src = 'https://via.placeholder.com/400x200?text=Flag+Not+Found';
+                                const isoMatch = /\/([a-z]{2})\.(svg|png)$/i.exec(currentCountry.flag);
+                                if (isoMatch) {
+                                    const iso = isoMatch[1];
+                                    const pngSrc = `https://flagcdn.com/w320/${iso}.png`;
+                                    e.target.onerror = null; // prevent infinite loop
+                                    e.target.src = pngSrc;
+                                } else {
+                                    console.error('Error loading flag:', currentCountry.flag);
+                                    e.target.onerror = null;
+                                    e.target.src = 'https://via.placeholder.com/400x200?text=Flag+Not+Found';
+                                }
                             }}
                         />
                     </div>
