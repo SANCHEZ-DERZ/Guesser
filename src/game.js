@@ -516,36 +516,76 @@ export const Game = ({
             {console.log('Current Country in Render:', currentCountry, currentCountry ? currentCountry.flag : 'N/A')}
             {showHomeScreen && (
                 <div className="home-screen">
-                    <h1>Угадай флаг</h1>
-                    <div className="difficulty-selector">
-                        <button 
-                            className={currentDifficulty === 'easy' ? 'active' : ''} 
-                            onClick={() => setCurrentDifficulty('easy')}
-                        >
-                            Легкий
-                        </button>
-                        <button 
-                            className={currentDifficulty === 'medium' ? 'active' : ''} 
-                            onClick={() => setCurrentDifficulty('medium')}
-                        >
-                            Средний
-                        </button>
-                        <button 
-                            className={currentDifficulty === 'hard' ? 'active' : ''} 
-                            onClick={() => setCurrentDifficulty('hard')}
-                        >
-                            Сложный
-                        </button>
+                    <div className="home-header">
+                        <span role="img" aria-label="world" className="logo">🌐</span>
+                        <h1>Угадай флаг</h1>
                     </div>
+                    <p className="sub-title">Проверь свои знания флагов стран мира!</p>
+
                     <div className="best-scores">
-                        <h3>Лучшие результаты:</h3>
-                        <p>Легкий: {bestScores.easy}</p>
-                        <p>Средний: {bestScores.medium}</p>
-                        <p>Сложный: {bestScores.hard}</p>
+                        <h3><span role="img" aria-label="cup">🏆</span> Твои лучшие результаты:</h3>
+                        <div className="scores-container">
+                            <div className="score-card">
+                                <span><span role="img" aria-label="runner">🏃</span> Легкий:</span>
+                                <strong>{bestScores.easy}</strong>
+                            </div>
+                            <div className="score-card">
+                                <span><span role="img" aria-label="user">👤</span> Средний:</span>
+                                <strong>{bestScores.medium}</strong>
+                            </div>
+                            <div className="score-card">
+                                <span><span role="img" aria-label="graduate">🎓</span> Сложный:</span>
+                                <strong>{bestScores.hard}</strong>
+                            </div>
+                        </div>
                     </div>
+
+                    <div className="difficulty-section">
+                         <h3><span role="img" aria-label="settings">⚙️</span> Выбери уровень сложности:</h3>
+                        <div className="difficulty-selector">
+                            <button
+                                className={currentDifficulty === 'easy' ? 'active' : ''}
+                                onClick={() => setCurrentDifficulty('easy')}
+                            >
+                                <span role="img" aria-label="runner">🏃</span> Легкий
+                            </button>
+                            <button
+                                className={currentDifficulty === 'medium' ? 'active' : ''}
+                                onClick={() => setCurrentDifficulty('medium')}
+                            >
+                                <span role="img" aria-label="user">👤</span> Средний
+                            </button>
+                            <button
+                                className={currentDifficulty === 'hard' ? 'active' : ''}
+                                onClick={() => setCurrentDifficulty('hard')}
+                            >
+                                <span role="img" aria-label="graduate">🎓</span> Сложный
+                            </button>
+                        </div>
+                        <p className="difficulty-description">
+                            <span role="img" aria-label="info">ℹ️</span>
+                            {currentDifficulty === 'easy' && ' Самые популярные страны мира'}
+                            {currentDifficulty === 'medium' && ' Популярные и менее известные страны'}
+                            {currentDifficulty === 'hard' && ' Редко встречающиеся и экзотические страны'}
+                        </p>
+                    </div>
+
                     <button className="start-button" onClick={handleStartGame}>
-                        Начать игру
+                        ▶ НАЧАТЬ ИГРУ
                     </button>
+
+                    <div className="rules-section">
+                        <h3><span role="img" aria-label="info-alt">ℹ️</span> Как играть:</h3>
+                        <ul>
+                            <li>Тебе будет показан флаг страны</li>
+                            <li>Введи название страны</li>
+                            <li>Если ответ правильный, будет показан следующий флаг</li>
+                            <li>Если ответ неправильный, игра заканчивается</li>
+                            <li>Флаги не повторяются в одной игре</li>
+                        </ul>
+                    </div>
+
+                    <div className="footer">Создано с <span style={{color: '#e74c3c'}}>❤️</span> | 2023 Угадай флаг</div>
                 </div>
             )}
 
@@ -592,13 +632,15 @@ export const Game = ({
                 <div className="game-over-screen">
                     <h2>Игра окончена!</h2>
                     <p>Ваш счет: {currentScore}</p>
-                    <p>Правильный ответ: {correctAnswer}</p>
-                    <button onClick={handleStartGame}>
-                        Играть снова
-                    </button>
-                    <button onClick={backToMenu}>
-                        В главное меню
-                    </button>
+                    <p className="correct-answer">Правильный ответ: {correctAnswer}</p>
+                    <div className="button-group">
+                        <button onClick={handleStartGame}>
+                            Играть снова
+                        </button>
+                        <button onClick={backToMenu}>
+                            В главное меню
+                        </button>
+                    </div>
                 </div>
             )}
 
@@ -606,12 +648,14 @@ export const Game = ({
                 <div className="level-complete-screen">
                     <h2>Уровень пройден!</h2>
                     <p>Ваш счет: {currentScore}</p>
-                    <button onClick={goToNextLevel}>
-                        Следующий уровень
-                    </button>
-                    <button onClick={backToMenu}>
-                        В главное меню
-                    </button>
+                    <div className="button-group">
+                        <button onClick={goToNextLevel}>
+                            Следующий уровень
+                        </button>
+                        <button onClick={backToMenu}>
+                            В главное меню
+                        </button>
+                    </div>
                 </div>
             )}
         </div>
