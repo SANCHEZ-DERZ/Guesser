@@ -101,6 +101,16 @@ function normalizeDifficulty(rawDifficulty) {
     return null; // неизвестное значение, оставляем без изменений
 }
 
+// Utility to shuffle array (Fisher-Yates)
+function shuffleArray(arr) {
+    const array = [...arr];
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
 export const Game = ({ 
     assistant, 
     gameState: parentGameState, 
@@ -302,7 +312,7 @@ export const Game = ({
     async function fetchCountries() {
         try {
             console.log('Отправка запроса к REST Countries API...');
-            const response = await fetch('https://restcountries.com/v3.1/all?fields=name,flags,population,area');
+            const response = await fetch('https://restcountries.com/v3.1/all?fields=name,flags,population,area,translations');
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
@@ -311,7 +321,7 @@ export const Game = ({
             
             const countries = data.map(country => {
                 const englishName = country.name.common;
-                const russianName = getRussianName(englishName);
+                const russianName = country.translations?.rus?.common || getRussianName(englishName) || englishName;
                 const flagUrl = country.flags.png;
                 // Логируем URL флага для каждой страны
                 console.log(`Страна: ${englishName}, URL флага: ${flagUrl}`);
@@ -325,33 +335,42 @@ export const Game = ({
                 };
             });
             
-            const easyCountries = countries.filter(country => 
+            // Remove duplicates & entries without flag
+            const uniqueMap = new Map();
+            countries.forEach(c => {
+                if (!c.flag) return; // skip missing flag
+                if (!uniqueMap.has(c.name.toLowerCase())) {
+                    uniqueMap.set(c.name.toLowerCase(), c);
+                }
+            });
+            const uniqueCountries = Array.from(uniqueMap.values());
+
+            // Re-filter lists based on unique countries
+            const easyCountries = uniqueCountries.filter(country => 
                 popularCountries.some(popularName => 
                     country.russianName.toLowerCase() === popularName.toLowerCase() || 
                     country.name.toLowerCase() === popularName.toLowerCase()
                 )
             );
-            
-            const mediumCountries = countries.filter(country => 
+
+            const mediumCountries = uniqueCountries.filter(country => 
                 mediumPopularCountries.some(mediumName => 
                     country.russianName.toLowerCase() === mediumName.toLowerCase() || 
                     country.name.toLowerCase() === mediumName.toLowerCase()
                 ) && 
                 !easyCountries.some(easyCountry => easyCountry.name === country.name)
             );
-            
-            const hardCountries = countries.filter(country => 
+
+            const hardCountries = uniqueCountries.filter(country => 
                 !easyCountries.some(easyCountry => easyCountry.name === country.name) &&
                 !mediumCountries.some(mediumCountry => mediumCountry.name === country.name)
             );
 
-            console.log('Отфильтрованные страны:', {
-                easy: easyCountries.length,
-                medium: mediumCountries.length,
-                hard: hardCountries.length
-            });
-
-            return { easyCountries, mediumCountries, hardCountries };
+            return { 
+                easyCountries: shuffleArray(easyCountries),
+                mediumCountries: shuffleArray(mediumCountries),
+                hardCountries: shuffleArray(hardCountries)
+            };
         } catch (error) {
             console.error('Ошибка при получении данных о странах из API:', error);
             return { easyCountries: [], mediumCountries: [], hardCountries: [] };
@@ -409,17 +428,21 @@ export const Game = ({
     // Обработка ответа
     const handleAnswer = (answer) => {
         if (!currentCountry) return;
-        
-        const isCorrect = answer.toLowerCase() === currentCountry.russianName.toLowerCase();
+        const userAns = answer.trim().toLowerCase();
+        const isCorrect = userAns === currentCountry.russianName.toLowerCase() ||
+                          userAns === currentCountry.name.toLowerCase();
         if (isCorrect) {
             setCurrentScore(prev => prev + 1);
-            // Выбираем следующую страну
-            if (availableCountries.length > 0) {
-                const nextCountry = availableCountries[0];
+            let nextList = [...availableCountries];
+            let nextCountry = null;
+            // Find next distinct country with a different flag URL
+            while(nextList.length && (!nextCountry || nextCountry.flag === currentCountry.flag)) {
+                nextCountry = nextList.shift();
+            }
+            if (nextCountry) {
                 setCurrentCountry(nextCountry);
-                setAvailableCountries(availableCountries.slice(1));
+                setAvailableCountries(nextList);
             } else {
-                // Если больше нет стран, завершаем уровень
                 levelComplete();
             }
         } else {
