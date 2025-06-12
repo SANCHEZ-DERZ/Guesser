@@ -22,8 +22,8 @@ const initializeAssistant = (getState) => {
 
 const App = () => {
   const [assistant, setAssistant] = useState(null);
-  const [gameState, setGameState] = useState('start');
-  const [currentCommand, setCurrentCommand] = useState(null);
+  const [gameState, setGameState] = useState('idle');
+  const [lastAssistantAction, setLastAssistantAction] = useState(null);
   const [difficulty, setDifficulty] = useState('easy');
   const [score, setScore] = useState(0);
 
@@ -32,7 +32,7 @@ const App = () => {
     const initAssistant = async () => {
       try {
         const assistantInstance = await initializeAssistant(() => ({
-          gameState,
+          game_state: gameState,
           difficulty,
           score
         }));
@@ -48,15 +48,13 @@ const App = () => {
   // Обработка команд от ассистента
   const handleAssistantAction = (action, data) => {
     console.log('Получено действие от ассистента:', action, data);
+    setLastAssistantAction({ type: action, data: data });
     
     switch (action) {
-      case 'startGame':
-        setGameState('start');
+      case 'start_game':
+        setGameState('playing');
         break;
       case 'waitingForAnswer':
-        if (data && data.handleCommand) {
-          setCurrentCommand(data.handleCommand);
-        }
         break;
       case 'gameOver':
         setGameState('end');
@@ -64,6 +62,8 @@ const App = () => {
       default:
         console.log('Неизвестное действие:', action);
     }
+    // Сбросить lastAssistantAction после обработки, чтобы обеспечить повторное срабатывание useEffect в Game
+    setTimeout(() => setLastAssistantAction(null), 0);
   };
 
   // Обработка сообщений от ассистента
@@ -73,8 +73,8 @@ const App = () => {
     const handleMessage = (message) => {
       console.log('Получено сообщение от ассистента:', message);
       
-      if (message.type === 'text' && currentCommand) {
-        currentCommand(message.payload.text);
+      if (message.type === 'text' && lastAssistantAction && lastAssistantAction.data && lastAssistantAction.data.handleCommand) {
+        lastAssistantAction.data.handleCommand(message.payload.text);
       }
     };
 
@@ -84,7 +84,7 @@ const App = () => {
         unsubscribe();
       }
     };
-  }, [assistant, currentCommand]);
+  }, [assistant, lastAssistantAction]);
 
   // Обработка изменений состояния игры
   const handleStateChange = (newState) => {
@@ -102,6 +102,7 @@ const App = () => {
         score={score}
         onStateChange={handleStateChange}
         onAssistantAction={handleAssistantAction}
+        assistantCommand={lastAssistantAction}
       />
     </div>
   );

@@ -16,19 +16,23 @@ theme: /
             addGameControlSuggestions($context);
             $reactions.transition("/ОбработкаОтвета");
             
-        random:
-            a: Ответ принят!
-            a: Проверяю ответ!
-            a: Сейчас проверю!
-            
     state: ОбработкаОтвета
         event!: answer_submitted
         
         script:
             log('answerProcessed: context: ' + JSON.stringify($context))
             var eventData = $context && $context.request && $context.request.data && $context.request.data.eventData || {}
-            $reactions.answer({
-                "value": eventData.result
-            });
+            var replyText = 'Проверка...';
+            if (eventData.result === 'correct') {
+                replyText = 'Верно!';
+            } else if (eventData.result === 'wrong') {
+                replyText = 'Неправильный ответ.';
+            }
+            $reactions.answer(replyText);
             addGameControlSuggestions($context);
             $reactions.transition("/ОтветПользователя");
+
+        random:
+            a: Ответ принят!
+            a: Проверяю ответ!
+            a: Сейчас проверю!

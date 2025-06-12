@@ -91,6 +91,16 @@ function getRussianName(englishName) {
     return countryTranslations[englishName.toLowerCase()] || '';
 }
 
+// Утилита для маппинга строки сложности (приходит от ассистента) к внутреннему значению
+function normalizeDifficulty(rawDifficulty) {
+    if (!rawDifficulty || typeof rawDifficulty !== 'string') return null;
+    const d = rawDifficulty.toLowerCase();
+    if (['легкий', 'легкая', 'easy'].includes(d)) return 'easy';
+    if (['средний', 'medium'].includes(d)) return 'medium';
+    if (['сложный', 'тяжелый', 'hard'].includes(d)) return 'hard';
+    return null; // неизвестное значение, оставляем без изменений
+}
+
 export const Game = ({ 
     assistant, 
     gameState: parentGameState, 
@@ -124,6 +134,7 @@ export const Game = ({
     const [correctAnswer, setCorrectAnswer] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [message, setMessage] = useState('');
+    const [startGameTrigger, setStartGameTrigger] = useState(false);
 
     const answerInputRef = useRef(null);
     const flagImageRef = useRef(null);
@@ -140,15 +151,22 @@ export const Game = ({
     // Обработка команд от голосового ассистента
     useEffect(() => {
         if (assistant) {
-            const unsubscribe = assistant.on('data', (event) => {
-                if (event.action) {
-                    handleAssistantAction(event.action);
+            const unsubData = assistant.on('data', (event) => {
+                const actionData = event.smart_app_data || event.action || event.data || null;
+                if (actionData) {
+                    handleAssistantAction(actionData);
                 }
             });
-            return () => {
-                if (unsubscribe) {
-                    unsubscribe();
+
+            const unsubCommand = assistant.on('command', (event) => {
+                if (event && event.command && event.command.type === 'smart_app_data' && event.command.action) {
+                    handleAssistantAction(event.command.action);
                 }
+            });
+
+            return () => {
+                unsubData && unsubData();
+                unsubCommand && unsubCommand();
             };
         }
     }, [assistant]);
@@ -159,16 +177,20 @@ export const Game = ({
             console.log('Game received assistant command:', assistantCommand);
             switch (assistantCommand.type) {
                 case 'start_game':
-                    console.log('Starting game from assistant command');
-                    handleStartGame();
+                    console.log('Setting startGameTrigger to true');
+                    setStartGameTrigger(true);
                     break;
-                case 'set_difficulty':
-                    console.log('Setting difficulty from assistant command:', assistantCommand.difficulty);
-                    setCurrentDifficulty(assistantCommand.difficulty);
+                case 'set_difficulty': {
+                    const mapped = normalizeDifficulty(assistantCommand.difficulty);
+                    console.log('Setting difficulty from assistant command:', assistantCommand.difficulty, '=>', mapped);
+                    if (mapped) {
+                        setCurrentDifficulty(mapped);
+                    }
                     break;
+                }
                 case 'restart_game':
                     console.log('Restarting game from assistant command');
-                    handleStartGame();
+                    setStartGameTrigger(true);
                     break;
                 case 'submit_answer':
                     console.log('Submitting answer from assistant command:', assistantCommand.answer);
@@ -180,16 +202,43 @@ export const Game = ({
         }
     }, [assistantCommand]);
 
+    // New useEffect to handle game start when countries are loaded
+    useEffect(() => {
+        if (startGameTrigger && !isLoading && availableCountries.length > 0) {
+            console.log('startGameTrigger, isLoading, and availableCountries are ready. Calling handleStartGame.');
+            handleStartGame();
+            setStartGameTrigger(false);
+        } else if (startGameTrigger && isLoading) {
+            console.log('Waiting for countries to load before starting game...');
+        } else if (startGameTrigger && !isLoading && availableCountries.length === 0) {
+            console.error('Cannot start game: Countries not loaded or availableCountries is empty.');
+            if (assistant) {
+                assistant.sendData({
+                    action: {
+                        type: 'say_text',
+                        text: 'Извините, не удалось загрузить страны для игры. Пожалуйста, попробуйте позже.',
+                    },
+                });
+            }
+            setStartGameTrigger(false);
+        }
+    }, [startGameTrigger, isLoading, availableCountries, assistant]);
+
     const handleAssistantAction = (action) => {
         switch (action.type) {
             case 'start_game':
-                handleStartGame();
+                setStartGameTrigger(true);
                 break;
-            case 'set_difficulty':
-                setCurrentDifficulty(action.difficulty);
+            case 'set_difficulty': {
+                const mapped = normalizeDifficulty(action.difficulty);
+                console.log('handleAssistantAction: raw difficulty', action.difficulty, 'mapped to', mapped);
+                if (mapped) {
+                    setCurrentDifficulty(mapped);
+                }
                 break;
+            }
             case 'restart_game':
-                handleStartGame();
+                setStartGameTrigger(true);
                 break;
             case 'submit_answer':
                 handleAnswer(action.answer);
@@ -208,6 +257,7 @@ export const Game = ({
     useEffect(() => {
         async function loadCountries() {
             setIsLoading(true);
+            console.log('loadCountries: Setting isLoading to true.');
             try {
                 console.log('Начало загрузки стран из API...');
                 const countriesData = await fetchCountries();
@@ -234,6 +284,7 @@ export const Game = ({
                     }
                     console.log('Установлены начальные страны:', initialCountries.length);
                     setAvailableCountries(initialCountries);
+                    console.log('loadCountries: availableCountries set, length:', initialCountries.length);
                 } else {
                     console.error('Не удалось загрузить страны из API');
                 }
@@ -241,6 +292,7 @@ export const Game = ({
                 console.error('Ошибка при загрузке стран из API:', error);
             } finally {
                 setIsLoading(false);
+                console.log('loadCountries: Setting isLoading to false.');
             }
         }
         loadCountries();
@@ -437,6 +489,23 @@ export const Game = ({
         setShowLevelCompleteScreen(true);
         updateBestScore();
     }
+
+    // резерв: если команда submit_answer не пришла, но текст получен
+    useEffect(() => {
+        if (!assistant) return;
+
+        const handler = (msg) => {
+            if (showGameScreen && msg.type === 'text') {
+                const userText = msg.payload?.text?.trim();
+                if (userText) {
+                    handleAnswer(userText);
+                }
+            }
+        };
+
+        const unsub = assistant.on('message', handler);
+        return () => unsub && unsub();
+    }, [assistant, showGameScreen]);
 
     if (isLoading) {
         return <div className="loading">Загрузка...</div>;
