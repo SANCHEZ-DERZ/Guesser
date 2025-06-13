@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
+import FlagImage from './FlagImage';
 import './styles.css';
 
 // Списки стран для фильтрации по сложности
@@ -143,9 +144,6 @@ export const Game = ({
     const [isLoading, setIsLoading] = useState(true);
     const [startGameTrigger, setStartGameTrigger] = useState(false);
 
-    const answerInputRef = useRef(null);
-    const flagImageRef = useRef(null);
-
     // Обновляем состояние родительского компонента при изменении локального состояния
     useEffect(() => {
         onStateChange({
@@ -285,25 +283,33 @@ export const Game = ({
             const countries = data.map(country => {
                 const englishName = country.name.common;
                 const russianName = country.translations?.rus?.common || getRussianName(englishName) || englishName;
-                // Формируем URL флага: сначала берем PNG, если его нет – самостоятельно формируем путь с CDN,
-                // в крайнем случае используем SVG.
-                let flagUrl = '';
-                if (country.cca2) {
-                    flagUrl = `https://flagcdn.com/w320/${country.cca2.toLowerCase()}.png`;
-                }
-                if (!flagUrl) {
-                    flagUrl = country.flags.png || country.flags.svg || '';
-                }
-                if (!flagUrl) {
-                    flagUrl = 'https://via.placeholder.com/400x200?text=Flag';
-                }
-                // Логируем URL флага для каждой страны
-                console.log(`Страна: ${englishName}, URL флага: ${flagUrl}`);
+                const iso = (country.cca2 || '').toLowerCase();
+                const urls = [];
+
+                // Сначала добавляем SVG из API, так как они обычно самые надежные
+                if (country.flags?.svg) urls.push(country.flags.svg);
                 
+                // Затем добавляем PNG из API
+                if (country.flags?.png) urls.push(country.flags.png);
+                
+                // Добавляем резервные источники, если есть ISO код
+                if (iso) {
+                    // flagcdn обычно самый быстрый, поэтому добавляем его первым
+                    urls.push(`https://flagcdn.com/w320/${iso}.png`);
+                    urls.push(`https://flagcdn.com/${iso}.svg`);
+                    
+                    // GitHub как запасной вариант
+                    urls.push(`https://raw.githubusercontent.com/hampusborgos/country-flags/main/png250px/${iso}.png`);
+                    
+                    // Дополнительные источники
+                    urls.push(`https://flagpedia.net/data/flags/w320/${iso}.png`);
+                    urls.push(`https://www.countryflagicons.com/FLAT/64/${iso.toUpperCase()}.png`);
+                }
+
                 return {
                     name: englishName,
                     russianName: russianName || englishName,
-                    flag: flagUrl,
+                    flagUrls: [...new Set(urls)], // Удаляем дубликаты
                     population: country.population || 0,
                     area: country.area || 0
                 };
@@ -312,9 +318,10 @@ export const Game = ({
             // Remove duplicates & entries without flag
             const uniqueMap = new Map();
             countries.forEach(c => {
-                if (!c.flag) return; // skip missing flag
-                if (!uniqueMap.has(c.name.toLowerCase())) {
-                    uniqueMap.set(c.name.toLowerCase(), c);
+                if (!c.flagUrls.length) return; // skip missing flags
+                const id = c.name.toLowerCase();
+                if (!uniqueMap.has(id)) {
+                    uniqueMap.set(id, c);
                 }
             });
             const uniqueCountries = Array.from(uniqueMap.values());
@@ -387,7 +394,7 @@ export const Game = ({
         // Выбираем первую страну
         if (countriesForGame.length > 0) {
             const firstCountry = countriesForGame[0];
-            console.log('Setting first country:', firstCountry, 'Flag URL:', firstCountry.flag);
+            console.log('Setting first country:', firstCountry, 'Flag URLs:', firstCountry.flagUrls);
             setCurrentCountry(firstCountry);
             // Удаляем первую страну из доступных
             setAvailableCountries(countriesForGame.slice(1));
@@ -407,11 +414,7 @@ export const Game = ({
         if (isCorrect) {
             setCurrentScore(prev => prev + 1);
             let nextList = [...availableCountries];
-            let nextCountry = null;
-            // Find next distinct country with a different flag URL
-            while(nextList.length && (!nextCountry || nextCountry.flag === currentCountry.flag)) {
-                nextCountry = nextList.shift();
-            }
+            const nextCountry = nextList.shift() || null;
             if (nextCountry) {
                 setCurrentCountry(nextCountry);
                 setAvailableCountries(nextList);
@@ -492,7 +495,7 @@ export const Game = ({
 
     return (
         <div className="game-container">
-            {console.log('Current Country in Render:', currentCountry, currentCountry ? currentCountry.flag : 'N/A')}
+            {console.log('Current Country in Render:', currentCountry, currentCountry ? currentCountry.flagUrls.length : 'N/A')}
             {showHomeScreen && (
                 <div className="home-screen">
                     <div className="home-header">
@@ -575,29 +578,14 @@ export const Game = ({
                         <p>Счет: {currentScore}</p>
                     </div>
                     <div className="flag-container">
-                        <img 
-                            ref={flagImageRef}
-                            src={currentCountry.flag} 
+                        <FlagImage 
+                            urls={currentCountry.flagUrls}
                             alt={`Флаг ${currentCountry.name}`}
                             className="flag-image"
-                            onError={(e) => {
-                                const isoMatch = /\/([a-z]{2})\.(svg|png)$/i.exec(currentCountry.flag);
-                                if (isoMatch) {
-                                    const iso = isoMatch[1];
-                                    const pngSrc = `https://flagcdn.com/w320/${iso}.png`;
-                                    e.target.onerror = null; // prevent infinite loop
-                                    e.target.src = pngSrc;
-                                } else {
-                                    console.error('Error loading flag:', currentCountry.flag);
-                                    e.target.onerror = null;
-                                    e.target.src = 'https://via.placeholder.com/400x200?text=Flag+Not+Found';
-                                }
-                            }}
                         />
                     </div>
                     <div className="answer-input">
                         <input
-                            ref={answerInputRef}
                             type="text"
                             value={userAnswer}
                             onChange={(e) => setUserAnswer(e.target.value)}
