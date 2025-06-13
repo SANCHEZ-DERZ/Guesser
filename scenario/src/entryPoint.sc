@@ -11,8 +11,6 @@ require: js/actions.js
 require: sc/startGame.sc
 require: sc/setDifficulty.sc
 require: sc/restartGame.sc
-# Затем подключаем файл обработки ответов
-require: sc/submitAnswer.sc
 
 patterns:
     $AnyText = $nonEmptyGarbage

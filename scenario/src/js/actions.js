@@ -17,18 +17,6 @@ function restartGame(context) {
     }, context);
 }
 
-function submitAnswer(answer, context) {
-    var gameState = get_game_state(get_request($context));
-    if (!gameState || gameState !== "playing") {
-        $reactions.answer("Сначала начните игру!");
-        return;
-    }
-    addAction({
-        type: "submit_answer",
-        answer: answer
-    }, context);
-}
-
 function addAction(action, context) {
     var commandObj = {
         type: "smart_app_data",

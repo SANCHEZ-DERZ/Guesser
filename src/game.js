@@ -113,10 +113,8 @@ function shuffleArray(arr) {
 
 export const Game = ({ 
     assistant, 
-    gameState: parentGameState, 
     difficulty: parentDifficulty, 
     score: parentScore,
-    assistantCommand,
     onStateChange 
 }) => {
     const [currentDifficulty, setCurrentDifficulty] = useState(parentDifficulty || 'easy');
@@ -143,7 +141,6 @@ export const Game = ({
     const [userAnswer, setUserAnswer] = useState('');
     const [correctAnswer, setCorrectAnswer] = useState('');
     const [isLoading, setIsLoading] = useState(true);
-    const [message, setMessage] = useState('');
     const [startGameTrigger, setStartGameTrigger] = useState(false);
 
     const answerInputRef = useRef(null);
@@ -180,37 +177,6 @@ export const Game = ({
             };
         }
     }, [assistant]);
-
-    // Обработка команд от ассистента
-    useEffect(() => {
-        if (assistantCommand) {
-            console.log('Game received assistant command:', assistantCommand);
-            switch (assistantCommand.type) {
-                case 'start_game':
-                    console.log('Setting startGameTrigger to true');
-                    setStartGameTrigger(true);
-                    break;
-                case 'set_difficulty': {
-                    const mapped = normalizeDifficulty(assistantCommand.difficulty);
-                    console.log('Setting difficulty from assistant command:', assistantCommand.difficulty, '=>', mapped);
-                    if (mapped) {
-                        setCurrentDifficulty(mapped);
-                    }
-                    break;
-                }
-                case 'restart_game':
-                    console.log('Restarting game from assistant command');
-                    setStartGameTrigger(true);
-                    break;
-                case 'submit_answer':
-                    console.log('Submitting answer from assistant command:', assistantCommand.answer);
-                    handleAnswer(assistantCommand.answer);
-                    break;
-                default:
-                    console.warn('Unknown assistant command type:', assistantCommand.type);
-            }
-        }
-    }, [assistantCommand]);
 
     // New useEffect to handle game start when countries are loaded
     useEffect(() => {
@@ -249,9 +215,6 @@ export const Game = ({
             }
             case 'restart_game':
                 setStartGameTrigger(true);
-                break;
-            case 'submit_answer':
-                handleAnswer(action.answer);
                 break;
             default:
                 console.warn('Unknown action type:', action.type);
@@ -430,7 +393,6 @@ export const Game = ({
             setAvailableCountries(countriesForGame.slice(1));
         } else {
             console.warn('Нет стран для выбранного уровня сложности:', currentDifficulty);
-            setMessage('Нет стран для игры на этом уровне сложности. Попробуйте другой.');
             setShowGameOverScreen(true);
             setShowGameScreen(false);
         }
@@ -523,23 +485,6 @@ export const Game = ({
         setShowLevelCompleteScreen(true);
         updateBestScore();
     }
-
-    // резерв: если команда submit_answer не пришла, но текст получен
-    useEffect(() => {
-        if (!assistant) return;
-
-        const handler = (msg) => {
-            if (showGameScreen && msg.type === 'text') {
-                const userText = msg.payload?.text?.trim();
-                if (userText) {
-                    handleAnswer(userText);
-                }
-            }
-        };
-
-        const unsub = assistant.on('message', handler);
-        return () => unsub && unsub();
-    }, [assistant, showGameScreen]);
 
     if (isLoading) {
         return <div className="loading">Загрузка...</div>;

@@ -23,7 +23,6 @@ const initializeAssistant = (getState) => {
 const App = () => {
   const [assistant, setAssistant] = useState(null);
   const [gameState, setGameState] = useState('idle');
-  const [lastAssistantAction, setLastAssistantAction] = useState(null);
   const [difficulty, setDifficulty] = useState('easy');
   const [score, setScore] = useState(0);
 
@@ -45,47 +44,6 @@ const App = () => {
     initAssistant();
   }, [gameState, difficulty, score]);
 
-  // Обработка команд от ассистента
-  const handleAssistantAction = (action, data) => {
-    console.log('Получено действие от ассистента:', action, data);
-    setLastAssistantAction({ type: action, data: data });
-    
-    switch (action) {
-      case 'start_game':
-        setGameState('playing');
-        break;
-      case 'waitingForAnswer':
-        break;
-      case 'gameOver':
-        setGameState('end');
-        break;
-      default:
-        console.log('Неизвестное действие:', action);
-    }
-    // Сбросить lastAssistantAction после обработки, чтобы обеспечить повторное срабатывание useEffect в Game
-    setTimeout(() => setLastAssistantAction(null), 0);
-  };
-
-  // Обработка сообщений от ассистента
-  useEffect(() => {
-    if (!assistant) return;
-
-    const handleMessage = (message) => {
-      console.log('Получено сообщение от ассистента:', message);
-      
-      if (message.type === 'text' && lastAssistantAction && lastAssistantAction.data && lastAssistantAction.data.handleCommand) {
-        lastAssistantAction.data.handleCommand(message.payload.text);
-      }
-    };
-
-    const unsubscribe = assistant.on('message', handleMessage);
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
-    };
-  }, [assistant, lastAssistantAction]);
-
   // Обработка изменений состояния игры
   const handleStateChange = (newState) => {
     if (newState.gameState) setGameState(newState.gameState);
@@ -97,12 +55,9 @@ const App = () => {
     <div className="app">
       <Game 
         assistant={assistant}
-        gameState={gameState}
         difficulty={difficulty}
         score={score}
         onStateChange={handleStateChange}
-        onAssistantAction={handleAssistantAction}
-        assistantCommand={lastAssistantAction}
       />
     </div>
   );
